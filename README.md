@@ -8,8 +8,8 @@ This demo sets up a simple Flask web application on an Apache Web Server, backed
 
 1. Create a docker container based off Ubuntu  
 
-> port=$((10000 + RANDOM % 55535))
-> echo $port # Make sure the random number is between 10000 and 65535
+> port=$((10000 + RANDOM % 55535))  
+> echo $port # Make sure the random number is between 10000 and 65535  
 > docker run -p $port:80 -it ubuntu bash  
 
 2. Install Ansible  
