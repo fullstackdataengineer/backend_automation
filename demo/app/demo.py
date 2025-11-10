@@ -19,5 +19,9 @@ def dbtest():
       return e.message + '\n'
   return 'Database Connected Successfully!\n'
 
+@app.route('/edu')
+def custom():
+  return 'Edu endpoint!\n'
+
 if __name__ == '__main__':
   app.run()
