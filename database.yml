@@ -2,53 +2,76 @@
 - hosts: localhost
   become: true
   tasks:
-    - name: install db tools
-      apt: 
-        name: "{{ item }}"
+    - name: install db tools and server
+      apt:
+        name:
+          - python3-mysqldb
+          - python3-pymysql
+          - mysql-server
         state: present
         update_cache: yes
-      loop:
-        - python3-mysqldb
-        - python3-pymysql
-        
-    - name: install mysql-server
-      apt:
-        name: mysql-server
-        state: latest
-        update_cache: yes
-
-    - name: ensure mysql service is running
-      service:
-        name: mysql
-        state: started
-        enabled: yes
+        cache_valid_time: 3600
 
     - name: mysql listening on all ports
       lineinfile:
         dest: /etc/mysql/mysql.conf.d/mysqld.cnf
-        regex: ^bind-address
+        regexp: ^bind-address
         line: "bind-address = 0.0.0.0"
       notify: restart mysql
+
+    - name: remove obsolete native_password config
+      file:
+        path: /etc/mysql/mysql.conf.d/native_password.cnf
+        state: absent
+      notify: restart mysql
+
+    - name: ensure mysql runtime dir exists
+      file:
+        path: /var/run/mysqld
+        state: directory
+        owner: mysql
+        group: mysql
+        mode: "0755"
+
+    - name: start mysql if not running (container, no systemd)
+      shell: |
+        mysqladmin ping --silent && exit 0
+        nohup mysqld_safe --user=mysql >/dev/null 2>&1 &
+        for i in $(seq 1 30); do mysqladmin ping --silent && exit 0; sleep 1; done
+        exit 1
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: apply pending restarts before configuring users
+      meta: flush_handlers
 
     - name: create demo database
       mysql_db:
         login_unix_socket: /var/run/mysqld/mysqld.sock
         name: demo
         state: present
-        
+
     - name: create demo user
       mysql_user:
         login_unix_socket: /var/run/mysqld/mysqld.sock
         name: demo
-        password: demo
-        priv: 
-          'demo.*': 'ALL,GRANT'
         host: '%'
+        plugin: caching_sha2_password
+        plugin_auth_string: demo
+        update_password: on_create
+        priv:
+          'demo.*': 'ALL,GRANT'
         state: present
+      no_log: true
 
   handlers:
     - name: restart mysql
-      service:
-        name: mysql
-        state: restarted
-
+      shell: |
+        mysqladmin shutdown || true
+        for i in $(seq 1 30); do mysqladmin ping --silent || break; sleep 1; done
+        nohup mysqld_safe --user=mysql >/dev/null 2>&1 &
+        for i in $(seq 1 30); do mysqladmin ping --silent && exit 0; sleep 1; done
+        exit 1
+      args:
+        executable: /bin/bash
