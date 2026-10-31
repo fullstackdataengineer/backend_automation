@@ -15,7 +15,7 @@ This demo sets up a simple Flask web application on an Apache Web Server, backed
 2. Install Ansible  
 
 > apt update  
-> apt install -y ansible  
+> DEBIAN_FRONTEND=noninteractive TZ=Europe/Madrid apt-get install -y ansible
 
 3. Install Git  
 > apt install -y git  
